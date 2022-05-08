@@ -68,6 +68,13 @@ class Node(threading.Thread):
     def getNeighbours(self):
         return self.neighbours
 
+    def getNeighboursStatus(self):
+        print('MyStatus: ',self.status)
+        for n in self.neighbours:
+            conn = rpyc.connect("localhost", n)
+            print(conn.root.GetStatus())
+            conn.close()
+
     def run(self):
         
         t=ThreadedServer(self.rpcService, port=self.port)
@@ -77,18 +84,4 @@ class Node(threading.Thread):
 
 def start_server(server):
         server.start()
-
-def setNeighbours(self, node, neighbours):
-        for neighbour in neighbours:
-            if(neighbour.port == self.port):
-                continue
-            else:
-                self.neighbours.add(neighbour)
-
-        #for true_neighbour in self.neighbours:
-         #       conn.root.backupNeighbourSet
-                conn = rpyc.connect("localhost", neighbour.port)
-                if(len(conn.root.getNeighbours()) == 0):
-                    conn.root.setNeighbours(neighbour, neighbours)
-                    conn.close()
 

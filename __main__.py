@@ -20,6 +20,7 @@ print('all node started', nodes[primary])
 conn = rpyc.connect("localhost", port=nodes[primary])
 conn.root.SetNeighbours(nodes)
 print(conn.root.GetNeighbours())
+print(conn.root.GetAllStatus())
     
 
    

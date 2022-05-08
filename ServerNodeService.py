@@ -18,3 +18,9 @@ class ServerNodeService(rpyc.Service):
 
   def exposed_GetNeighbours(self):
     return self.node.getNeighbours()
+
+  def exposed_GetAllStatus(self):
+    return self.node.getNeighboursStatus()
+
+  def exposed_GetStatus(self):
+    return self.node.getStatus()
