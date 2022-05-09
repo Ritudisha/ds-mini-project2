@@ -19,6 +19,12 @@ class ServerNodeService(rpyc.Service):
   def exposed_GetNeighbours(self):
     return self.node.getNeighbours()
   
+  def ResetNeighbours(self,nodes):
+    return self.node.resetNeighbours(nodes)  
+  
+  def RemoveNeighbours(self):
+    return self.node.removeNeighbours() 
+  
   # status stuff
   def exposed_GetAllStatus(self):
     return self.node.getAllStatus()
@@ -54,4 +60,12 @@ class ServerNodeService(rpyc.Service):
   
   def exposed_CommitToOrder(self):
     return self.node.commitToOrder()
+  
+  def exposed_OrderInfo(self):
+    return self.node.orderInfo()
+  
+  def exposed_GetId(self):
+    return self.node.getId()
+  
+  
     
