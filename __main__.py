@@ -8,7 +8,7 @@ from node import Node
  
 N = 4#int(sys.argv[1])
 PORT = 18812
-primary = 1 #rand.randint(0, N-1)
+primary = rand.randint(0, N-1)
 nodes = {}
 
 
@@ -109,8 +109,7 @@ while true:
         if(id in nodes):
             nodes.pop(id)
         if(id == primary):
-            primary = min(nodes.keys())
-        print(primary, nodes)
+            primary = min(list(nodes.keys()))
         
         conn = rpyc.connect("localhost", port=nodes[primary])
         conn.root.SetNeighbours(nodes)
