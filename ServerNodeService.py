@@ -60,12 +60,15 @@ class ServerNodeService(rpyc.Service):
   
   def exposed_CommitToOrder(self):
     return self.node.commitToOrder()
-  
+
   def exposed_OrderInfo(self):
     return self.node.orderInfo()
   
   def exposed_GetId(self):
     return self.node.getId()
-  
-  
-    
+
+  def exposed_Kill(self):
+    return self.node.kill()
+
+  def exposed_SetPrimary(self, id):
+    self.node.setPrimary(id)
