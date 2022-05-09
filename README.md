@@ -6,6 +6,3 @@ commands list:
 (g-state <N> <status>) (N > 0, status is faulty or not_faulty) "changes to faulty"
 (actual-order <order>) (order is attack or retreat) "gives an order"
 (exit) "exits the programm"
-
-(adds <N>) "adds number of nodes" "doesn work" 
-(g-kill <N>) "removes node"
