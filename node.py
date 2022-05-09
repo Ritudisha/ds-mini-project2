@@ -26,7 +26,7 @@ class Node(threading.Thread):
         self.id = id
         self.status = 'NF'
         self.primary = primary
-        self.neighbours = []
+        self.neighbours = {}
         self.order = 'undefined'
         self.order_msg = dict()
         
@@ -35,6 +35,7 @@ class Node(threading.Thread):
         self.host = "localhost"
         self.port = port
         self.rpcService = ServerNodeService(self)
+        self.die = False
     
     def setStatus(self, status):
         self.status = status
@@ -55,19 +56,28 @@ class Node(threading.Thread):
         return self.neighbours
                       
     def setNeighbours(self, neighbours):
-        for neighbour in neighbours:
-            if(neighbour == self.port):
+        for i in neighbours:
+            t = type(i)
+            if(neighbours[i] == self.port):
                 continue
             else:
-                self.neighbours.append(neighbour)
+                self.neighbours[i] = neighbours[i]
         
-        for neighbour in self.neighbours:
+        for neighbour in neighbours:
                 #conn.root.backupNeighbourSet
-                conn = rpyc.connect("localhost", neighbour)
+                conn = rpyc.connect("localhost", neighbours[neighbour])
                 if(len(conn.root.GetNeighbours()) == 0):
                     conn.root.SetNeighbours(neighbours)
                     conn.close()
                 # print("neighbour",neighbour)
+        to_remove = None
+        for n in self.neighbours.keys():
+            if n in neighbours:
+                continue
+            else:
+                to_remove = n
+        if to_remove != None:
+            self.neighbours.pop(to_remove)
                     
     # get status stuff                       
     def getStatus(self):
@@ -75,8 +85,8 @@ class Node(threading.Thread):
 
     def getAllStatus(self):
         print(f"G{self.id}, state={self.status}")
-        for n in self.neighbours:
-            conn = rpyc.connect("localhost", n)
+        for n in self.neighbours.keys():
+            conn = rpyc.connect("localhost", self.neighbours[n])
             id,status = conn.root.GetStatus()
             print(f"G{id}, state={status}")
             conn.close()
@@ -85,8 +95,8 @@ class Node(threading.Thread):
     def gatherForStatusChange(self,index,st):
         was_changed = False
         was_changed = self.statusChange(index,st,was_changed)
-        for n in self.neighbours:
-            conn = rpyc.connect("localhost", n)
+        for n in self.neighbours.keys():
+            conn = rpyc.connect("localhost", self.neighbours[n])
             was_changed = conn.root.StatusChange(index,st,was_changed)
             conn.close()
                 
@@ -110,17 +120,17 @@ class Node(threading.Thread):
         self.setOrder(order)
         sender = self.port
         
-        for n in self.neighbours:
+        for n in self.neighbours.keys():
             order = self.orderToSend(order)
-            conn = rpyc.connect("localhost", n)
+            conn = rpyc.connect("localhost", self.neighbours[n])
             conn.root.GetOrder(order,sender)
             conn.root.SendOrderToEveryone(order)
             conn.close()
         
         bad_guys = dict()
         
-        for n in self.neighbours: 
-            conn = rpyc.connect("localhost", n)
+        for n in self.neighbours.keys(): 
+            conn = rpyc.connect("localhost", self.neighbours[n])
             bad = conn.root.AgreeOnOrder()
             conn.close()
             bad_guys[n] = bad
@@ -128,8 +138,8 @@ class Node(threading.Thread):
         print(f"G{self.id}, primary, majority={self.order}, state={self.status}")
         orders = dict()
         
-        for n in self.neighbours: 
-            conn = rpyc.connect("localhost", n)
+        for n in self.neighbours.keys(): 
+            conn = rpyc.connect("localhost", self.neighbours[n])
             conn.root.CommitToOrder()
             conn.close()
             
@@ -158,12 +168,12 @@ class Node(threading.Thread):
     
     def sendOrderToEveryone(self,order):
         sender = self.port
-        for n in self.neighbours:
-            if n == self.primary:
+        for n in self.neighbours.keys():
+            if self.neighbours[n] == self.primary:
                 continue
             else:
                 order = self.orderToSend(order)
-                conn = rpyc.connect("localhost", n)
+                conn = rpyc.connect("localhost", self.neighbours[n])
                 conn.root.GetOrder(order,sender)
                 conn.close()
         return    
@@ -204,13 +214,30 @@ class Node(threading.Thread):
     def commitToOrder(self):
         print(f"G{self.id}, secondary, majority={self.order}, state={self.status}")
         return self.order
+
+    def kill(self):
+        self.die = True
     
     
     def run(self):
         t=ThreadedServer(self.rpcService, port=self.port)
         thread = threading.Thread(target = start_server, args={t,}, daemon=True)
-        
-        thread.start()
+        thread.start() 
+
+    def setPrimary(self, id):
+        self.Primary = id
+        if(id == self.id):
+            for neighbour in self.neighbours.keys():
+                conn = rpyc.connect("localhost", self.neighbours[neighbour])
+                if(len(conn.root.GetNeighbours()) == 0):
+                    conn.root.SetPrimary(id)
+                    conn.close()
+
+    def removeNeighbour(self, id):
+        self.Primary = id
+        self.neighbours.pop(id)
+
+    
 
 def start_server(server):
         server.start()
