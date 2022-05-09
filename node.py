@@ -39,6 +39,9 @@ class Node(threading.Thread):
     
     def setStatus(self, status):
         self.status = status
+        
+    def getId(self):
+        return self.id
 
     def kill(self):
         return "Not implemeted"
@@ -69,7 +72,6 @@ class Node(threading.Thread):
                 if(len(conn.root.GetNeighbours()) == 0):
                     conn.root.SetNeighbours(neighbours)
                     conn.close()
-                # print("neighbour",neighbour)
         to_remove = None
         for n in self.neighbours.keys():
             if n in neighbours:
@@ -79,6 +81,21 @@ class Node(threading.Thread):
         if to_remove != None:
             self.neighbours.pop(to_remove)
                     
+    def resetNeighbours(self, neighbours):
+        print("hello")
+        self.neighbours = set()
+        for neighbour in self.neighbours:
+                #conn.root.backupNeighbourSet
+                conn = rpyc.connect("localhost", neighbour)
+                conn.root.RemoveNeighbours()
+                conn.close()
+                
+        self.setNeighbours(self, neighbours)
+                
+    def removeNeighbours(self):
+        self.neighbours = set()
+        return     
+                      
     # get status stuff                       
     def getStatus(self):
         return self.id, self.status
@@ -88,7 +105,7 @@ class Node(threading.Thread):
         for n in self.neighbours.keys():
             conn = rpyc.connect("localhost", self.neighbours[n])
             id,status = conn.root.GetStatus()
-            print(f"G{id}, state={status}")
+            print(f"G{id}, secondary, state={status}")
             conn.close()
             
     # status change stuff
@@ -137,11 +154,14 @@ class Node(threading.Thread):
             
         print(f"G{self.id}, primary, majority={self.order}, state={self.status}")
         orders = dict()
+        orders[self.port] = self.order
         
         for n in self.neighbours.keys(): 
             conn = rpyc.connect("localhost", self.neighbours[n])
             conn.root.CommitToOrder()
             conn.close()
+            
+        self.orderInfo(bad_guys, orders)
             
         return
     
@@ -218,19 +238,65 @@ class Node(threading.Thread):
     def kill(self):
         self.die = True
     
+    def orderInfo(self, bad_guys, orders):
+        print(self.neighbours)
+        count = 1
+        faulty_nodes = 0
+        if self.status == "F":
+            faulty_nodes += 1
+            
+        for n in self.neighbours.keys():
+            print(n)
+            conn = rpyc.connect("localhost", self.neighbours[n])
+            id,status = conn.root.GetStatus()
+            if status == "F":
+                faulty_nodes += 1
+            count += 1
+            conn.close()
+            
+        if (count - 1)/3 >= faulty_nodes:
+            rule = True
+        else:
+            rule = False
+        
+        
+        # self.getAllStatus()
+        
+        if rule:
+            if all(value == "attack" for value in orders.values()) or all(value == "retreat" for value in orders.values()):
+                if faulty_nodes > 0:
+                    print(f"Execute order: {orders[self.primary]}! {faulty_nodes} faulty node in the system - {int(count/2) + 1} out of {count} quorum suggest {orders[self.primary]}")
+                elif faulty_nodes == 0:
+                    print(orders) 
+                    print(self.primary)
+                    print(f"Execute order: {orders[self.primary]}! Non-faulty nodes in the system - {int(count/2) + 1} out of {count} quorum suggest {orders[self.primary]}")
+            else: # elif orders[self.primary] != orders[self.neighbours[0]]:
+                print(f"Execute order: cannot be determined! There are enough generals in the system but primary node sent completely different message to what he assigned to itself")
+                print(f"Since primary node only gives out orders and not gets any messages from the secondary nodes")
+                print(f"(We didnt knew if the primary node sould get the messages from secondary nodes so for now we are leaving like this.)")
+                print(f"(But if he would get messages from the other generals than this exception would not happen)")
+        else:
+            if all(value == "attack" for value in orders.values()) or all(value == "retreat" for value in orders.values()):
+                print(f"Execute order: {orders[self.primary]}! There are to many faulty nodes = {faulty_nodes} but by pure luck quorum has been reached. {int(count/2) + 1} out of {count} quorum suggest {orders[self.primary]}")
+            else:
+                print(f"Execute order: cannot be determined - not enough generals in the system! {faulty_nodes} faulty node in the system - {int(count/2) + 1} out of {count} quorum suggest {orders[self.primary]}")
+        
+            
+            
+    
     
     def run(self):
         t=ThreadedServer(self.rpcService, port=self.port)
         thread = threading.Thread(target = start_server, args={t,}, daemon=True)
         thread.start() 
 
-    def setPrimary(self, id):
-        self.Primary = id
+    def setPrimary(self, port):
+        self.Primary = port
         if(id == self.id):
             for neighbour in self.neighbours.keys():
                 conn = rpyc.connect("localhost", self.neighbours[neighbour])
                 if(len(conn.root.GetNeighbours()) == 0):
-                    conn.root.SetPrimary(id)
+                    conn.root.SetPrimary(port)
                     conn.close()
 
     def removeNeighbour(self, id):

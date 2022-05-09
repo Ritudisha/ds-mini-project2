@@ -6,88 +6,98 @@ import random as rand
 from sympy import true
 from node import Node
  
-N = 4
+N = 4#int(sys.argv[1])
 PORT = 18812
 primary = 1 #rand.randint(0, N-1)
 nodes = {}
 
+
 # create nodes
 for i in range(1,N+1):
-    node = Node(PORT + i, i, primary)
+    node = Node(PORT + i, i, PORT + 1)
     node.run()
     nodes[i] = node.port
+    lastport = PORT + i
 
-print('all node started', primary)
+print('all node started', nodes[primary])
 
 conn = rpyc.connect("localhost", port=nodes[primary])
 conn.root.SetNeighbours(nodes)
 conn.close()
 
-# print(conn.root.GetNeighbours())
-
-
-conn = rpyc.connect("localhost", port=nodes[primary])
-changed = conn.root.GatherForStatusChange(1,"faulty")
-conn.close() 
-
-# conn = rpyc.connect("localhost", port=primary)
-# changed = conn.root.GatherForStatusChange(3,"faulty")
-# conn.close() 
-
-
-conn = rpyc.connect("localhost", port=nodes[primary])
-conn.root.GetAllStatus()
-conn.close()
-
-
-conn = rpyc.connect("localhost", port=nodes[primary])
-conn.root.exposed_GatherForOrder("attack")
-conn.close()
-
+# add node stuff
+def addNode(N,lastport):
+    for i in range(1, N+1):
+        node = Node(lastport + i, i, nodes[primary])
+        node.run()
+        nodes[i] = node.port
+        lastport = lastport + i
     
+    conn = rpyc.connect("localhost", port=nodes[primary])
+    conn.root.ResetNeighbours(nodes)
+    conn.close()
+
 # command loop
 
 while true:
     command = input("\nCommand please: ")
-    
-    if command == "g-state":
-        conn = rpyc.connect("localhost", port=nodes[primary])
-        conn.root.GetAllStatus()
-        conn.close()
+
+    if "g-state" in command: 
+        command = command.split(" ")
         
-    elif "g-state" in command:
-        
-        try:
-            changed = False
-            command = command.split(" ")
-            index = int(command[1])
-            st = command[2]
-            conn = rpyc.connect("localhost", port=nodes[primary])
-            changed = conn.root.GatherForStatusChange(index,st)
-            conn.close() 
-            if changed:
-                print(f'node {index} was changed to {st}')
-            else:
-                print(f'There is no node {index}')
-                
+        if len(command) == 1: # status command
             conn = rpyc.connect("localhost", port=nodes[primary])
             conn.root.GetAllStatus()
             conn.close()
-                
-        except:
-            print("unknown command")
+            continue
+        
+        
+        if len(command) == 3: # state change command
+            try:
+                changed = False
+                index = int(command[1])
+                st = command[2]
+                if st == "faulty" or st == "not_faulty":
+                    conn = rpyc.connect("localhost", port=nodes[primary])
+                    changed = conn.root.GatherForStatusChange(index,st)
+                    conn.close() 
+                    if changed:
+                        print(f'node {index} was changed to {st}')
+                    else:
+                        print(f'There is no node {index}')
+                        
+                    conn = rpyc.connect("localhost", port=nodes[primary])
+                    conn.root.GetAllStatus()
+                    conn.close()
+                else:
+                    print("unknown command: try g-state faulty or g-state not_faulty ")
+            except:
+                print('Error')
+        else:
+            print("unknown command")  
             
-            
-    elif "actual-order" in command:
+    elif "actual-order" in command: # order command
         try:
             command = command.split(" ")
             order = command[1]
-            conn = rpyc.connect("localhost", port=nodes[primary])
-            changed = conn.root.GatherForOrder(order)
-            conn.close() 
+            if command[1] == "attack" or command[1] == "retreat":
+                conn = rpyc.connect("localhost", port=nodes[primary])
+                changed = conn.root.GatherForOrder(order)
+                conn.close()
+            else:
+                print("unknown command: try actual-order or retreat")
             
         except:
-            print("unknown command")
+            raise
+            
+    elif command == "exit":
+        print("exiting")
+        sys.exit()
+        
+    elif "add" in command:
+        command = command.split(" ")
+        n = int(command[1])
+        addNode(n,lastport)
 
     elif "g-kill" in command:
         id = int(command.split(' ')[1])
@@ -104,13 +114,17 @@ while true:
         
         conn = rpyc.connect("localhost", port=nodes[primary])
         conn.root.SetNeighbours(nodes)
-        conn.root.SetPrimary(primary)
+        conn.root.SetPrimary(nodes[primary])
         print(conn.root.GetNeighbours())
         conn.close()
         
     else:
         print("unknown command")
         
+        
+
+    
+
         
 
 
